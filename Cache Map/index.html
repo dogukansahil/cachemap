@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="leaflet.css" />
+  <title>Cache Map</title>
+  <style>
+ html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #555346;
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+
+#map-container {
+  width: 70%;
+  height: 100%;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+#admin-panel {
+  width: 30%;
+  height: 90%;
+  padding: 20px;
+  background-color: #555346;
+  border: 0px solid #888;
+  border-radius: 5px;
+  text-align: center;
+  overflow-y: auto;
+}
+
+#admin-panel form {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+#admin-panel form label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
+  text-align: left;
+}
+
+#admin-panel form input[type="text"] {
+  width: 100%;
+  padding: 5px;
+  margin-bottom: 10px;
+}
+
+#admin-panel form button {
+  padding: 10px;
+  background-color: #2b411c;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+#locations-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+#locations-list li {
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: #333;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+#locations-list li span {
+  flex-grow: 1;
+  margin-right: 10px;
+}
+
+#locations-list li button {
+  padding: 5px 10px;
+  background-color: #dc3545;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.delete-button {
+  padding: 5px 10px;
+  background-color: #dc3545;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+#share-import-buttons {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+#share-button,
+#import-button {
+  padding: 10px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+#share-button:hover,
+#import-button:hover {
+  background-color: #0056b3;
+}
+
+
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <div id="map"></div>
+  </div>
+  <div id="admin-panel">
+    <div id="share-import-buttons">
+  <button id="share-button">Export</button>
+  <button id="import-button">Import</button>
+</div>
+
+  <form id="add-marker-form">
+    <label for="latitude">Latitude:</label>
+    <input type="text" id="latitude" name="latitude">
+    <label for="longitude">Longitude:</label>
+    <input type="text" id="longitude" name="longitude">
+    <label for="location-name">Name:</label>
+    <input type="text" id="location-name" name="location-name">
+    <label for="emoji">Emoji:</label>
+    <select id="emoji" name="emoji">
+      <option value="🏰">🏰</option>
+      <option value="🟢">🟢</option>
+      <option value="🔴">🔴</option>
+    </select>
+    <button type="submit">Submit</button>
+    <button id="delete-all-button">Delete All</button>
+  </form>
+  <ul id="locations-list"></ul>
+</div>
+  <script src="leaflet.js"></script>
+  <script>
+var map = L.map('map').setView([51.505, -0.09], 1);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors | <a href="https://github.com/dogukansahil">DogukanSahil</a>', 
+  maxZoom: 19,
+}).addTo(map);
+var markersLayer = L.layerGroup().addTo(map);
+var savedLocations = JSON.parse(localStorage.getItem('savedLocations')) || [];
+function addMarkerToMap(latitude, longitude, name, emoji) {
+  var existingMarker = getMarkerByName(name);
+  if (!existingMarker) {
+    var marker = L.marker([latitude, longitude]).addTo(markersLayer).bindPopup(getPopupContent(name));
+    marker.name = name;
+    marker.setIcon(L.icon({ iconUrl: getEmojiIconUrl(emoji), iconSize: [32, 32] }));
+    savedLocations.push({ latitude: latitude, longitude: longitude, name: name, emoji: emoji, timestamp: new Date().toLocaleString() });
+    localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
+    displaySavedLocations();
+  }
+}
+function displaySavedLocations() {
+  var locationsList = document.getElementById('locations-list');
+  locationsList.innerHTML = '';
+  savedLocations.forEach(function(location, index) {
+    var listItem = document.createElement('li');
+    listItem.innerHTML = '<span>' + getEmojiIcon(location.emoji) + ' | ' + location.name + ' | ' + location.timestamp + '</span>';
+    var deleteButton = document.createElement('button');
+    deleteButton.textContent = '🗑️';
+    deleteButton.addEventListener('click', function(e) {
+      e.stopPropagation();
+      deleteLocation(index);
+    });
+    listItem.appendChild(deleteButton);
+    locationsList.appendChild(listItem);
+    listItem.addEventListener('click', function() {
+      var marker = getMarkerByName(location.name);
+      if (marker) {
+        marker.openPopup();
+      }
+    });
+  });
+  addSavedMarkersToMap();
+}
+function addSavedMarkersToMap() {
+  savedLocations.forEach(function(location) {
+    var marker = L.marker([location.latitude, location.longitude]).addTo(markersLayer).bindPopup(getPopupContent(location.name));
+    marker.name = location.name;
+    marker.setIcon(L.icon({ iconUrl: getEmojiIconUrl(location.emoji), iconSize: [32, 32] }));
+  });
+}
+function deleteLocation(index) {
+  var location = savedLocations[index];
+  savedLocations.splice(index, 1);
+  localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
+  var marker = getMarkerByName(location.name);
+  if (marker) {
+    markersLayer.removeLayer(marker);
+  }
+  displaySavedLocations();
+}
+function deleteAllLocations() {
+  savedLocations = [];
+  localStorage.removeItem('savedLocations');
+  markersLayer.clearLayers();
+  displaySavedLocations();
+}
+function getMarkerByName(name) {
+  var marker = null;
+  markersLayer.eachLayer(function(layer) {
+    if (layer.name === name) {
+      marker = layer;
+    }
+  });
+  return marker;
+}
+function getEmojiIcon(emoji) {
+  return '<span>' + emoji + '</span>';
+}
+function getEmojiIconUrl(emoji) {
+  var canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 32;
+  var context = canvas.getContext('2d');
+  context.font
+= '32px sans-serif';
+context.fillText(emoji, 0, 24);
+return canvas.toDataURL();
+}
+document.getElementById('add-marker-form').addEventListener('submit', function(e) {
+e.preventDefault();
+var latitude = document.getElementById('latitude').value;
+var longitude = document.getElementById('longitude').value;
+var name = document.getElementById('location-name').value;
+var emoji = document.getElementById('emoji').value;
+if (latitude && longitude && name && emoji) {
+addMarkerToMap(latitude, longitude, name, emoji);
+document.getElementById('latitude').value = '';
+document.getElementById('longitude').value = '';
+document.getElementById('location-name').value = '';
+document.getElementById('emoji').value = '📍';
+}
+});
+document.getElementById('delete-all-button').addEventListener('click', function() {
+deleteAllLocations();
+});
+window.addEventListener('load', function() {
+displaySavedLocations();
+});
+map.on('click', function(e) {
+var latitude = e.latlng.lat.toFixed(6);
+var longitude = e.latlng.lng.toFixed(6);
+document.getElementById('latitude').value = latitude;
+document.getElementById('longitude').value = longitude;
+});
+function addSavedMarkersToMap() {
+savedLocations.forEach(function(location) {
+var marker = L.marker([location.latitude, location.longitude]).addTo(markersLayer).bindPopup(getPopupContent(location.name));
+marker.name = location.name;
+marker.setIcon(L.icon({ iconUrl: getEmojiIconUrl(location.emoji), iconSize: [32, 32] }));
+});
+}
+function getPopupContent(name) {
+var deleteButton = '<button class="delete-button" onclick="deleteLocationByName(\'' + name + '\')">🗑️</button>';
+return '<div><strong>' + name + '</strong><br>' + deleteButton + '</div>';
+}
+function deleteLocationByName(name) {
+var locationIndex = savedLocations.findIndex(function(location) {
+return location.name === name;
+});
+if (locationIndex !== -1) {
+deleteLocation(locationIndex);
+}
+}
+document.getElementById('share-button').addEventListener('click', function() {
+  var sharedData = JSON.stringify(savedLocations);
+  navigator.clipboard.writeText(sharedData)
+    .then(function() {
+      console.log('Data copied to clipboard:', sharedData);
+      alert('The data has been copied to the clipboard.');
+    })
+    .catch(function(error) {
+      console.log('Data copy failed:', error);
+      alert('Data copy operation failed.');
+    });
+});
+document.getElementById('import-button').addEventListener('click', function() {
+  var importedData = prompt('Please paste the data to be imported:');
+  try {
+    var parsedData = JSON.parse(importedData);
+    savedLocations = parsedData;
+    localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
+    displaySavedLocations();
+    console.log('Data has been imported.');
+    alert('Data has been imported.');
+  } catch (error) {
+    console.log('Incorrect data, import failed.', error);
+    alert('Incorrect data, import failed.');
+  }
+});
+</script>
+</body>
+</html>
