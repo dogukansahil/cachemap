@@ -1,6 +1,7 @@
 
 # Cache Map
 Cache Map is a simple and user-friendly map application. This application allows you to display locations on a map using the OpenStreetMap and Leaflet.js libraries. It is specifically created for educational purposes.
+* Note: I'm working on cross-share encryption and a separate database. Developed with OpenAI.
 
 ## Features
 * Add Locations: You can add locations by clicking on the map. The latitude and longitude coordinates are automatically populated in the input fields.
